@@ -34,7 +34,7 @@ services:
     environment:
       DATABASE_URL: postgres://taskflow:taskflow_pass@postgres:5432/taskflow?sslmode=disable
       REDIS_URL: redis:6379
-      JWT_SECRET: supersecretjwtkey_changeme_in_production
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your local .env file}
       PORT: 8080
       FRONTEND_URL: http://localhost:3000
     depends_on:

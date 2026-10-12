@@ -3,39 +3,61 @@ package middleware
 import (
 	"net/http"
 	"strings"
+
 	"taskflow/internal/auth"
 
 	"github.com/gin-gonic/gin"
 )
 
 func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
+	return authMiddleware(jwtSecret, false)
+}
+
+// WebSocketAuthMiddleware permits a query token only for the
+// WebSocket handshake endpoint.
+func WebSocketAuthMiddleware(jwtSecret string) gin.HandlerFunc {
+	return authMiddleware(jwtSecret, true)
+}
+
+func authMiddleware(jwtSecret string, allowQueryToken bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var tokenStr string
 
-		// Check Authorization header first
 		header := c.GetHeader("Authorization")
+
 		if header != "" {
-			parts := strings.SplitN(header, " ", 2)
-			if len(parts) == 2 && parts[0] == "Bearer" {
-				tokenStr = parts[1]
+			const prefix = "Bearer "
+			if !strings.HasPrefix(header, prefix) {
+				c.AbortWithStatusJSON(
+					http.StatusUnauthorized,
+					gin.H{"error": "invalid authorization header"},
+				)
+				return
 			}
+			tokenStr = strings.TrimSpace(
+				strings.TrimPrefix(header, prefix),
+			)
 		}
 
-		// Fall back to query param (for WebSocket connections)
-		if tokenStr == "" {
+		// Query tokens are forbidden on ordinary REST endpoints.
+		if tokenStr == "" && allowQueryToken {
 			tokenStr = c.Query("token")
 		}
 
 		if tokenStr == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
-			c.Abort()
+			c.AbortWithStatusJSON(
+				http.StatusUnauthorized,
+				gin.H{"error": "missing token"},
+			)
 			return
 		}
 
 		claims, err := auth.ValidateToken(tokenStr, jwtSecret)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-			c.Abort()
+			c.AbortWithStatusJSON(
+				http.StatusUnauthorized,
+				gin.H{"error": "invalid token"},
+			)
 			return
 		}
 

@@ -25,8 +25,8 @@ func main() {
 	if redisURL == "" {
 		redisURL = "localhost:6379"
 	}
-	if jwtSecret == "" {
-		jwtSecret = "dev_secret"
+	if len(jwtSecret) < 32 {
+		log.Fatal("JWT_SECRET must be configured with at least 32 characters")
 	}
 	if port == "" {
 		port = "8080"
@@ -105,7 +105,7 @@ func main() {
 	}
 
 	// WebSocket (auth via query param for WS handshake)
-	r.GET("/ws/:boardId", middleware.AuthMiddleware(jwtSecret), boardHandler.HandleWebSocket)
+	r.GET("/ws/:boardId", middleware.WebSocketAuthMiddleware(jwtSecret), boardHandler.HandleWebSocket)
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
