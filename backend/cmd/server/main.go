@@ -59,8 +59,7 @@ func main() {
 
 	// WebSocket hub
 	hub := websocket.NewHub()
-	go hub.Run()
-	log.Println("✅ WebSocket hub running")
+	log.Println("✅ WebSocket hub initialized")
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
