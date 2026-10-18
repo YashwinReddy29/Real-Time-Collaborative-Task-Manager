@@ -14,16 +14,12 @@ import (
 
 func main() {
 	dbURL := os.Getenv("DATABASE_URL")
-	redisURL := os.Getenv("REDIS_URL")
 	jwtSecret := os.Getenv("JWT_SECRET")
 	port := os.Getenv("PORT")
 	frontendURL := os.Getenv("FRONTEND_URL")
 
 	if dbURL == "" {
 		log.Fatal("DATABASE_URL must be configured")
-	}
-	if redisURL == "" {
-		redisURL = "localhost:6379"
 	}
 	if len(jwtSecret) < 32 {
 		log.Fatal("JWT_SECRET must be configured with at least 32 characters")
