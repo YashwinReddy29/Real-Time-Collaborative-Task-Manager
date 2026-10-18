@@ -18,7 +18,7 @@ const priorityColors = {
   high: "text-red-400 bg-red-900/30",
 };
 
-export function TaskCard({ task, columns, boardId, onMove, onDelete, onUpdate }: Props) {
+export function TaskCard({ task, columns, boardId, onDelete, onUpdate }: Props) {
   const [showModal, setShowModal] = useState(false);
 
   return (

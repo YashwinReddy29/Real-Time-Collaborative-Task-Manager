@@ -41,12 +41,14 @@ export type Activity = {
   created_at: string;
 }
 
-export type WSEvent = {
-  type: string;
-  payload: any;
-  board_id: string;
-  user_id?: string;
-}
+export type WSEvent =
+  | { type: "activity"; payload: Activity; board_id: string; user_id?: string }
+  | { type: "presence.update"; payload: string[]; board_id: string; user_id?: string }
+  | { type: "task.created" | "task.updated" | "task.moved"; payload: Task; board_id: string; user_id?: string }
+  | { type: "task.deleted"; payload: { task_id: string }; board_id: string; user_id?: string }
+  | { type: "column.created"; payload: Column; board_id: string; user_id?: string }
+  | { type: "column.deleted"; payload: { column_id: string }; board_id: string; user_id?: string }
+  | { type: "user.joined" | "user.left"; payload: { user_id: string; user_name: string }; board_id: string; user_id?: string };
 
 export type BoardData = {
   board: Board;

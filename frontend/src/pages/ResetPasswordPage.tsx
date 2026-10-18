@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Zap, Loader2, CheckCircle, XCircle } from "lucide-react";
 import api from "../lib/api";
+import axios from "axios";
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -30,8 +31,12 @@ export default function ResetPasswordPage() {
       await api.post("/auth/reset-password", { token, password });
       setSuccess(true);
       setTimeout(() => navigate("/login"), 2000);
-    } catch (err: any) {
-      setError(err.response?.data?.error ?? "Invalid or expired token");
+    } catch (err: unknown) {
+      const message = axios.isAxiosError<{ error?: string }>(err)
+        ? err.response?.data?.error
+        : undefined;
+
+      setError(message ?? "Invalid or expired token");
     } finally {
       setLoading(false);
     }

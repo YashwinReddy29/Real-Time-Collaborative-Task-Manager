@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../lib/api";
-import { BoardData, WSEvent } from "../types";
+import type { Activity as BoardActivity, BoardData, WSEvent } from "../types";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { KanbanBoard } from "../components/board/KanbanBoard";
 import { ActivityFeed } from "../components/board/ActivityFeed";
@@ -14,20 +14,85 @@ export default function BoardPage() {
   const [data, setData] = useState<BoardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showActivity, setShowActivity] = useState(false);
-  const [activities, setActivities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<BoardActivity[]>([]);
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [showInvite, setShowInvite] = useState(false);
+  const eventRevision = useRef(0);
+  const refreshSequence = useRef(0);
+
+  const refreshBoard = useCallback(async (signal?: AbortSignal) => {
+    if (!boardId) return;
+
+    const sequence = ++refreshSequence.current;
+    const maxAttempts = 3;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (signal?.aborted || sequence !== refreshSequence.current) {
+        return;
+      }
+
+      const revision = eventRevision.current;
+
+      try {
+        const [boardResponse, activityResponse] = await Promise.all([
+          api.get<BoardData>(`/boards/${boardId}`, { signal }),
+          api.get<BoardActivity[]>(`/boards/${boardId}/activity`, { signal }),
+        ]);
+
+        if (signal?.aborted || sequence !== refreshSequence.current) {
+          return;
+        }
+
+        // A WebSocket event arrived while fetching.
+        // Retry to obtain a newer database snapshot.
+        if (revision !== eventRevision.current) {
+          continue;
+        }
+
+        setData(boardResponse.data);
+        setActivities(activityResponse.data);
+        return;
+      } catch (error) {
+        if (signal?.aborted || sequence !== refreshSequence.current) {
+          return;
+        }
+
+        console.error("Failed to refresh board", error);
+        return;
+      }
+    }
+
+    // Avoid overwriting live state if the board is changing rapidly.
+    console.warn("Board refresh deferred because live events are ongoing");
+  }, [boardId]);
 
   useEffect(() => {
     if (!boardId) return;
-    api.get(`/boards/${boardId}`)
-      .then((res) => setData(res.data))
-      .finally(() => setLoading(false));
-    api.get(`/boards/${boardId}/activity`)
-      .then((res) => setActivities(res.data));
-  }, [boardId]);
+
+    const controller = new AbortController();
+
+    const load = async () => {
+      await refreshBoard(controller.signal);
+
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+    };
+
+    void load();
+
+    return () => {
+      controller.abort();
+    };
+  }, [boardId, refreshBoard]);
 
   const handleWSEvent = useCallback((event: WSEvent) => {
+    if (event.type === "user.joined" || event.type === "user.left") {
+      return;
+    }
+
+    eventRevision.current += 1;
+
     if (event.type === "activity") {
       setActivities((prev) => [event.payload, ...prev].slice(0, 50));
       return;
@@ -60,7 +125,9 @@ export default function BoardPage() {
     });
   }, []);
 
-  useWebSocket(boardId ?? "", handleWSEvent);
+  useWebSocket(boardId ?? "", handleWSEvent, () => {
+    void refreshBoard();
+  });
 
   if (loading) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
