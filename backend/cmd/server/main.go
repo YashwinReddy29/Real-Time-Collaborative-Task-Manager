@@ -20,7 +20,7 @@ func main() {
 	frontendURL := os.Getenv("FRONTEND_URL")
 
 	if dbURL == "" {
-		dbURL = "postgres://taskflow:taskflow_pass@localhost:5434/taskflow?sslmode=disable"
+		log.Fatal("DATABASE_URL must be configured")
 	}
 	if redisURL == "" {
 		redisURL = "localhost:6379"
@@ -66,7 +66,24 @@ func main() {
 	boardHandler := handlers.NewBoardHandler(boardRepo, columnRepo, taskRepo, activityRepo, userRepo, hub, frontendURL)
 
 	// Router
-	r := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+
+	r := gin.New()
+
+	// Skip WebSocket request logging because JWTs appear in URL queries.
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		Skip: func(c *gin.Context) bool {
+			return len(c.Request.URL.Path) >= 4 &&
+				c.Request.URL.Path[:4] == "/ws/"
+		},
+	}))
+
+	r.Use(gin.Recovery())
+
+	// Do not trust arbitrary client-provided proxy headers.
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Fatal("failed to configure trusted proxies:", err)
+	}
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{frontendURL},
