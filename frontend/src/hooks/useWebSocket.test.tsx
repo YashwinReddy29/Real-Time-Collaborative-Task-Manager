@@ -9,6 +9,12 @@ vi.mock("../lib/api", () => ({
   default: {
     get: vi.fn(),
   },
+  getBackendOrigin: () => {
+    const configured = import.meta.env.VITE_API_ORIGIN?.trim();
+    return configured
+      ? configured.replaceAll(/[/]+$/g, "")
+      : window.location.origin;
+  },
 }));
 
 type SocketHandler = (() => void) | null;
@@ -59,6 +65,7 @@ describe("useWebSocket", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     localStorage.clear();
   });
 
@@ -68,6 +75,21 @@ describe("useWebSocket", () => {
     expect(MockWebSocket.instances).toHaveLength(1);
     expect(MockWebSocket.instances[0].url).toContain(
       "/ws/board-123?token=test-token"
+    );
+
+    unmount();
+  });
+
+  it("uses the configured hosted backend for WebSockets", () => {
+    vi.stubEnv(
+      "VITE_API_ORIGIN",
+      "https://taskflow-backend-7xt2.onrender.com/"
+    );
+
+    const { unmount } = render(<TestHook />);
+
+    expect(MockWebSocket.instances[0].url).toBe(
+      "wss://taskflow-backend-7xt2.onrender.com/ws/board-123?token=test-token"
     );
 
     unmount();

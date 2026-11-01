@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import axios from "axios";
-import api from "../lib/api";
+import api, { getBackendOrigin } from "../lib/api";
 import type { WSEvent } from "../types";
 
 const INITIAL_RETRY_MS = 1000;
@@ -65,11 +65,11 @@ export function useWebSocket(
 
       const url = new URL(
         `/ws/${encodeURIComponent(boardId)}`,
-        window.location.origin
+        getBackendOrigin()
       );
 
       url.protocol =
-        window.location.protocol === "https:" ? "wss:" : "ws:";
+        url.protocol === "https:" ? "wss:" : "ws:";
 
       url.searchParams.set("token", token);
 

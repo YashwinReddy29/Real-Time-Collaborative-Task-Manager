@@ -1,7 +1,15 @@
 import axios from "axios";
 
+export function getBackendOrigin(): string {
+  const configured = import.meta.env.VITE_API_ORIGIN?.trim();
+
+  return configured
+    ? configured.replace(/\/+$/, "")
+    : window.location.origin;
+}
+
 const api = axios.create({
-  baseURL: "/api",
+  baseURL: `${getBackendOrigin()}/api`,
   timeout: 15000,
 });
 
