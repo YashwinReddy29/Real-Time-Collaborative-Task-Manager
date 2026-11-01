@@ -1,0 +1,11 @@
+
+# Local secrets
+.env
+
+# TypeScript incremental build artifacts
+*.tsbuildinfo
+
+# Local Python smoke-test environment
+.smoke-venv/
+__pycache__/
+*.pyc

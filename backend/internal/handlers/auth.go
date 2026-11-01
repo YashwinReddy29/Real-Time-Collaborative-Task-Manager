@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"crypto/rand"
-	"fmt"
 	"net/http"
-	"time"
 	"taskflow/internal/auth"
 	"taskflow/internal/repository"
 
@@ -99,38 +96,23 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// ForgotPassword requires a configured secure delivery mechanism.
+// Until one is available, no reset tokens are generated.
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	var req struct {
 		Email string `json:"email" binding:"required,email"`
 	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request",
+		})
 		return
 	}
 
-	user, err := h.userRepo.GetByEmail(c.Request.Context(), req.Email)
-	if err != nil {
-		// Don't reveal whether email exists
-		c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link has been sent"})
-		return
-	}
-
-	// Generate token
-	token := generateResetToken()
-	expiresAt := time.Now().Add(1 * time.Hour)
-
-	_, err = h.userRepo.CreatePasswordReset(c.Request.Context(), token, user.ID, expiresAt)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create reset token"})
-		return
-	}
-
-	// In production this would send an email
-	// For dev/portfolio: print to terminal
-	resetURL := fmt.Sprintf("%s/reset-password?token=%s", "http://localhost:5173", token)
-	fmt.Printf("\n🔑 PASSWORD RESET LINK for %s:\n%s\n\n", user.Email, resetURL)
-
-	c.JSON(http.StatusOK, gin.H{"message": "If that email exists, a reset link has been sent"})
+	c.JSON(http.StatusServiceUnavailable, gin.H{
+		"error": "password recovery is temporarily unavailable",
+	})
 }
 
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
@@ -166,10 +148,4 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
-}
-
-func generateResetToken() string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	return fmt.Sprintf("%x", b)
 }

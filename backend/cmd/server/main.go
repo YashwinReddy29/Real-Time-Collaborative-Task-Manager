@@ -14,19 +14,15 @@ import (
 
 func main() {
 	dbURL := os.Getenv("DATABASE_URL")
-	redisURL := os.Getenv("REDIS_URL")
 	jwtSecret := os.Getenv("JWT_SECRET")
 	port := os.Getenv("PORT")
 	frontendURL := os.Getenv("FRONTEND_URL")
 
 	if dbURL == "" {
-		dbURL = "postgres://taskflow:taskflow_pass@localhost:5434/taskflow?sslmode=disable"
+		log.Fatal("DATABASE_URL must be configured")
 	}
-	if redisURL == "" {
-		redisURL = "localhost:6379"
-	}
-	if jwtSecret == "" {
-		jwtSecret = "dev_secret"
+	if len(jwtSecret) < 32 {
+		log.Fatal("JWT_SECRET must be configured with at least 32 characters")
 	}
 	if port == "" {
 		port = "8080"
@@ -59,15 +55,31 @@ func main() {
 
 	// WebSocket hub
 	hub := websocket.NewHub()
-	go hub.Run()
-	log.Println("✅ WebSocket hub running")
+	log.Println("✅ WebSocket hub initialized")
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
 	boardHandler := handlers.NewBoardHandler(boardRepo, columnRepo, taskRepo, activityRepo, userRepo, hub, frontendURL)
 
 	// Router
-	r := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+
+	r := gin.New()
+
+	// Skip WebSocket request logging because JWTs appear in URL queries.
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		Skip: func(c *gin.Context) bool {
+			return len(c.Request.URL.Path) >= 4 &&
+				c.Request.URL.Path[:4] == "/ws/"
+		},
+	}))
+
+	r.Use(gin.Recovery())
+
+	// Do not trust arbitrary client-provided proxy headers.
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Fatal("failed to configure trusted proxies:", err)
+	}
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{frontendURL},
@@ -106,7 +118,7 @@ func main() {
 	}
 
 	// WebSocket (auth via query param for WS handshake)
-	r.GET("/ws/:boardId", middleware.AuthMiddleware(jwtSecret), boardHandler.HandleWebSocket)
+	r.GET("/ws/:boardId", middleware.WebSocketAuthMiddleware(jwtSecret), boardHandler.HandleWebSocket)
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})

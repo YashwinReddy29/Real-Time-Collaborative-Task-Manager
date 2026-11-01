@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"errors"
+
+	"github.com/jackc/pgx/v5"
 	"net/http"
 	"taskflow/internal/models"
 	"taskflow/internal/repository"
@@ -9,6 +12,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
+
+// respondMutationError avoids exposing database internals to API clients.
+func respondMutationError(c *gin.Context, err error) {
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "resource not found"})
+		return
+	}
+
+	c.JSON(http.StatusInternalServerError, gin.H{
+		"error": "operation failed",
+	})
+}
 
 type BoardHandler struct {
 	userRepo     *repository.UserRepo
@@ -37,7 +52,9 @@ func NewBoardHandler(
 		userRepo:     userRepo,
 		hub:          hub,
 		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
+			CheckOrigin: func(r *http.Request) bool {
+				return isAllowedWebSocketOrigin(r, frontendURL)
+			},
 		},
 	}
 }
@@ -170,8 +187,8 @@ func (h *BoardHandler) DeleteColumn(c *gin.Context) {
 		return
 	}
 
-	if err := h.columnRepo.Delete(c.Request.Context(), columnID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.columnRepo.Delete(c.Request.Context(), boardID, columnID); err != nil {
+		respondMutationError(c, err)
 		return
 	}
 
@@ -217,7 +234,7 @@ func (h *BoardHandler) CreateTask(c *gin.Context) {
 		req.ColumnID, boardID, req.Title, req.Description, req.Priority, req.Position,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondMutationError(c, err)
 		return
 	}
 
@@ -254,9 +271,9 @@ func (h *BoardHandler) UpdateTask(c *gin.Context) {
 		return
 	}
 
-	task, err := h.taskRepo.Update(c.Request.Context(), taskID, req.Title, req.Description, req.Priority)
+	task, err := h.taskRepo.Update(c.Request.Context(), boardID, taskID, req.Title, req.Description, req.Priority)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondMutationError(c, err)
 		return
 	}
 
@@ -292,9 +309,9 @@ func (h *BoardHandler) MoveTask(c *gin.Context) {
 		return
 	}
 
-	task, err := h.taskRepo.Move(c.Request.Context(), taskID, req.ColumnID, req.Position)
+	task, err := h.taskRepo.Move(c.Request.Context(), boardID, taskID, req.ColumnID, req.Position)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondMutationError(c, err)
 		return
 	}
 
@@ -321,10 +338,10 @@ func (h *BoardHandler) DeleteTask(c *gin.Context) {
 		return
 	}
 
-	task, _ := h.taskRepo.GetByID(c.Request.Context(), taskID)
+	task, _ := h.taskRepo.GetByID(c.Request.Context(), boardID, taskID)
 
-	if err := h.taskRepo.Delete(c.Request.Context(), taskID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.taskRepo.Delete(c.Request.Context(), boardID, taskID); err != nil {
+		respondMutationError(c, err)
 		return
 	}
 
@@ -427,7 +444,7 @@ func (h *BoardHandler) InviteMember(c *gin.Context) {
 	h.logActivity(c, boardID, userID, userName, "invited "+invitedUser.Name+" to the board")
 
 	c.JSON(http.StatusOK, gin.H{
-		"user": invitedUser,
+		"user":    invitedUser,
 		"message": "member added successfully",
 	})
 }

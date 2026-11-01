@@ -1,11 +1,9 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: taskflow
-      POSTGRES_PASSWORD: taskflow_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: taskflow
     ports:
       - "5434:5432"
@@ -32,9 +30,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: postgres://taskflow:taskflow_pass@postgres:5432/taskflow?sslmode=disable
+      DATABASE_URL: postgres://taskflow:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/taskflow?sslmode=disable
       REDIS_URL: redis:6379
-      JWT_SECRET: supersecretjwtkey_changeme_in_production
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your local .env file}
       PORT: 8080
       FRONTEND_URL: http://localhost:3000
     depends_on:
