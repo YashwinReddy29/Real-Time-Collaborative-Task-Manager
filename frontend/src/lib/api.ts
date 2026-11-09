@@ -10,7 +10,7 @@ export function getBackendOrigin(): string {
 
 const api = axios.create({
   baseURL: `${getBackendOrigin()}/api`,
-  timeout: 15000,
+  timeout: 90000,
 });
 
 api.interceptors.request.use((config) => {

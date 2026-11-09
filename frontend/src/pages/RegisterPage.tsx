@@ -1,4 +1,5 @@
 import { useState } from "react";
+import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { Zap, Loader2 } from "lucide-react";
@@ -17,8 +18,20 @@ export default function RegisterPage() {
     try {
       await register(form.name, form.email, form.password);
       navigate("/");
-    } catch {
-      setError("Email already in use");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 409) {
+          setError("Email already in use");
+        } else if (error.response?.status === 400) {
+          setError("Please check your registration details.");
+        } else if (!error.response) {
+          setError("Could not reach the server. Please try again.");
+        } else {
+          setError("Registration is temporarily unavailable.");
+        }
+      } else {
+        setError("Registration failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
