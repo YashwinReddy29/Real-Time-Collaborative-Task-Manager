@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"taskflow/internal/auth"
 	"taskflow/internal/repository"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -37,7 +40,22 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	user, err := h.userRepo.Create(c.Request.Context(), req.Name, req.Email, string(hashed))
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "email already in use"})
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) &&
+			pgErr.Code == "23505" &&
+			pgErr.ConstraintName == "users_email_key" {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "email already in use",
+			})
+			return
+		}
+
+		log.Printf("registration database error: %v", err)
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "registration temporarily unavailable",
+		})
 		return
 	}
 
