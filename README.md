@@ -55,6 +55,66 @@ may take longer while the service starts.
 Password recovery is temporarily unavailable until secure email delivery
 is configured.
 
+## Quick Start
+
+### Docker Compose
+
+Create a local `.env` file in the repository root containing:
+
+- `POSTGRES_PASSWORD`: a strong local database password
+- `JWT_SECRET`: a random secret of at least 32 characters
+
+Do not commit the `.env` file.
+
+Run:
+
+```bash
+docker compose up --build -dOpen http://localhost:3000.
+
+The Docker Compose development stack includes PostgreSQL and Redis.
+The Go application's current real-time event delivery uses an in-memory
+WebSocket hub; Redis pub/sub is not implemented.
+Development
+- Go backend: backend/
+- React frontend: frontend/
+- Database: PostgreSQL
+- Frontend development server: npm run dev from frontend/
+- Backend development server: go run ./cmd/server from backend/
+Configure DATABASE_URL, JWT_SECRET, and FRONTEND_URL before
+starting the backend independently.
+API Reference
+Method	Endpoint	Purpose
+POST	/api/auth/register	Register
+POST	/api/auth/login	Sign in
+GET	/api/auth/me	Current user
+GET	/api/boards	List boards
+POST	/api/boards	Create board
+GET	/api/boards/:boardId	Board details
+POST	/api/boards/:boardId/invite	Add a registered member
+POST	/api/boards/:boardId/columns	Create column
+POST	/api/boards/:boardId/tasks	Create task
+PUT	/api/boards/:boardId/tasks/:taskId	Edit task
+PATCH	/api/boards/:boardId/tasks/:taskId/move	Move task
+DELETE	/api/boards/:boardId/tasks/:taskId	Delete task
+GET	/api/boards/:boardId/activity	Activity history
+
+The WebSocket endpoint is /ws/:boardId and requires authentication.
+Project Structure
+backend/
+  cmd/server/          Go HTTP server
+  internal/auth/       JWT authentication
+  internal/handlers/   REST and WebSocket handlers
+  internal/repository/ PostgreSQL operations
+  internal/websocket/  Real-time client hub
+
+frontend/
+  src/components/      Board interface
+  src/hooks/           Authentication and WebSocket hooks
+  src/pages/           Application pages
+  src/lib/             Shared API client
+
+.github/workflows/     CI pipeline
+docker-compose.yml     Local development services
 ## How Real-Time Works
 
 The Go backend maintains an in-memory WebSocket hub that maps board IDs to connected clients. When any user performs an action (create task, move task, etc.), the handler saves to PostgreSQL and then calls `hub.Broadcast()` which fans out the event to every client connected to that board. The React frontend receives these events and updates state directly — no polling, no page refreshes.
