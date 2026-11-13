@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5"
 	"taskflow/internal/models"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -45,7 +46,11 @@ func (r *TaskRepo) Create(ctx context.Context, columnID, boardID, title, descrip
 	task := &models.Task{}
 	err := r.db.QueryRow(ctx,
 		`INSERT INTO tasks (column_id, board_id, title, description, priority, position)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		 SELECT $1, $2, $3, $4, $5, $6
+         WHERE EXISTS (
+             SELECT 1 FROM columns
+             WHERE id = $1 AND board_id = $2
+         )
 		 RETURNING id, column_id, board_id, title, description, position,
 		           assignee_id, priority, created_at, updated_at`,
 		columnID, boardID, title, description, priority, position,
@@ -56,14 +61,14 @@ func (r *TaskRepo) Create(ctx context.Context, columnID, boardID, title, descrip
 	return task, err
 }
 
-func (r *TaskRepo) Update(ctx context.Context, id, title, description, priority string) (*models.Task, error) {
+func (r *TaskRepo) Update(ctx context.Context, boardID, id, title, description, priority string) (*models.Task, error) {
 	task := &models.Task{}
 	err := r.db.QueryRow(ctx,
 		`UPDATE tasks SET title=$1, description=$2, priority=$3, updated_at=NOW()
-		 WHERE id=$4
+		 WHERE id=$4 AND board_id=$5
 		 RETURNING id, column_id, board_id, title, description, position,
 		           assignee_id, priority, created_at, updated_at`,
-		title, description, priority, id,
+		title, description, priority, id, boardID,
 	).Scan(
 		&task.ID, &task.ColumnID, &task.BoardID, &task.Title, &task.Description,
 		&task.Position, &task.AssigneeID, &task.Priority, &task.CreatedAt, &task.UpdatedAt,
@@ -71,14 +76,18 @@ func (r *TaskRepo) Update(ctx context.Context, id, title, description, priority 
 	return task, err
 }
 
-func (r *TaskRepo) Move(ctx context.Context, taskID, newColumnID string, newPosition int) (*models.Task, error) {
+func (r *TaskRepo) Move(ctx context.Context, boardID, taskID, newColumnID string, newPosition int) (*models.Task, error) {
 	task := &models.Task{}
 	err := r.db.QueryRow(ctx,
 		`UPDATE tasks SET column_id=$1, position=$2, updated_at=NOW()
-		 WHERE id=$3
+		 WHERE id=$3 AND board_id=$4
+           AND EXISTS (
+               SELECT 1 FROM columns
+               WHERE id=$1 AND board_id=$4
+           )
 		 RETURNING id, column_id, board_id, title, description, position,
 		           assignee_id, priority, created_at, updated_at`,
-		newColumnID, newPosition, taskID,
+		newColumnID, newPosition, taskID, boardID,
 	).Scan(
 		&task.ID, &task.ColumnID, &task.BoardID, &task.Title, &task.Description,
 		&task.Position, &task.AssigneeID, &task.Priority, &task.CreatedAt, &task.UpdatedAt,
@@ -86,17 +95,23 @@ func (r *TaskRepo) Move(ctx context.Context, taskID, newColumnID string, newPosi
 	return task, err
 }
 
-func (r *TaskRepo) Delete(ctx context.Context, id string) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM tasks WHERE id = $1`, id)
-	return err
+func (r *TaskRepo) Delete(ctx context.Context, boardID, id string) error {
+	result, err := r.db.Exec(ctx, `DELETE FROM tasks WHERE id = $1 AND board_id = $2`, id, boardID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
-func (r *TaskRepo) GetByID(ctx context.Context, id string) (*models.Task, error) {
+func (r *TaskRepo) GetByID(ctx context.Context, boardID, id string) (*models.Task, error) {
 	task := &models.Task{}
 	err := r.db.QueryRow(ctx,
 		`SELECT id, column_id, board_id, title, description, position,
 		        assignee_id, priority, created_at, updated_at
-		 FROM tasks WHERE id = $1`, id,
+		 FROM tasks WHERE id = $1 AND board_id = $2`, id, boardID,
 	).Scan(
 		&task.ID, &task.ColumnID, &task.BoardID, &task.Title, &task.Description,
 		&task.Position, &task.AssigneeID, &task.Priority, &task.CreatedAt, &task.UpdatedAt,

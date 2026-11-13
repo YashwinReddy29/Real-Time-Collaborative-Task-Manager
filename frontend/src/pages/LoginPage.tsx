@@ -1,4 +1,5 @@
 import { useState } from "react";
+import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { Zap, Loader2 } from "lucide-react";
@@ -17,8 +18,18 @@ export default function LoginPage() {
     try {
       await login(form.email, form.password);
       navigate("/");
-    } catch {
-      setError("Invalid email or password");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          setError("Invalid email or password");
+        } else if (!error.response) {
+          setError("Could not reach the server. Please try again.");
+        } else {
+          setError("Login is temporarily unavailable.");
+        }
+      } else {
+        setError("Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

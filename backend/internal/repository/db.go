@@ -2,10 +2,14 @@ package repository
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+//go:embed migrations/002_task_board_integrity.sql
+var taskBoardIntegrityMigration string
 
 func NewPool(databaseURL string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(context.Background(), databaseURL)
@@ -79,6 +83,14 @@ func Migrate(pool *pgxpool.Pool) error {
 	CREATE INDEX IF NOT EXISTS idx_activities_board_id ON activities(board_id);
 	`
 	_, err := pool.Exec(context.Background(), schema)
+	if err != nil {
+		return err
+	}
+
+	_, err = pool.Exec(
+		context.Background(),
+		taskBoardIntegrityMigration,
+	)
 	return err
 }
 

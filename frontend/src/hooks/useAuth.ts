@@ -4,14 +4,11 @@ import { User } from "../types";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(localStorage.getItem("token")));
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
     api.get("/auth/me")
       .then((res) => setUser(res.data))
       .catch(() => localStorage.removeItem("token"))

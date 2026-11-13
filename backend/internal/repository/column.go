@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5"
 	"taskflow/internal/models"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -47,7 +48,13 @@ func (r *ColumnRepo) Create(ctx context.Context, boardID, name string, position 
 	return col, err
 }
 
-func (r *ColumnRepo) Delete(ctx context.Context, id string) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM columns WHERE id = $1`, id)
-	return err
+func (r *ColumnRepo) Delete(ctx context.Context, boardID, id string) error {
+	result, err := r.db.Exec(ctx, `DELETE FROM columns WHERE id = $1 AND board_id = $2`, id, boardID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }

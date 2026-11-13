@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { X, UserPlus, Loader2, CheckCircle } from "lucide-react";
 import api from "../../lib/api";
+import type { User } from "../../types";
+import axios from "axios";
 
 interface Props {
   boardId: string;
   onClose: () => void;
-  onInvited: (user: any) => void;
+  onInvited: (user: User) => void;
 }
 
 export function InviteModal({ boardId, onClose, onInvited }: Props) {
@@ -25,8 +27,12 @@ export function InviteModal({ boardId, onClose, onInvited }: Props) {
       setSuccess(`${res.data.user.name} added to the board!`);
       onInvited(res.data.user);
       setEmail("");
-    } catch (err: any) {
-      setError(err.response?.data?.error ?? "Something went wrong");
+    } catch (err: unknown) {
+      const message = axios.isAxiosError<{ error?: string }>(err)
+        ? err.response?.data?.error
+        : undefined;
+
+      setError(message ?? "Something went wrong");
     } finally {
       setLoading(false);
     }

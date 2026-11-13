@@ -1,12 +1,11 @@
 # TaskFlow — Real-Time Collaborative Task Manager
 
-A production-ready Kanban board with real-time collaboration via WebSockets. Multiple users can create boards, manage tasks, and see each other's changes instantly.
+A deployed Kanban board with real-time collaboration via WebSockets. Multiple users can create boards, manage tasks, and see each other's changes instantly.
 
 ![Go](https://img.shields.io/badge/Go-1.23-00ADD8?style=flat&logo=go)
-![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat&logo=typescript)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?style=flat&logo=typescript)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat&logo=postgresql)
-![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=flat&logo=redis)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker)
 
 ## Features
@@ -17,139 +16,102 @@ A production-ready Kanban board with real-time collaboration via WebSockets. Mul
 - **Activity feed** — Live log of every action (create, move, delete, invite)
 - **Task detail modal** — Edit title, description, priority, and column in one view
 - **Board invites** — Invite teammates by email address
-- **Forgot password** — Secure token-based password reset flow
 - **JWT auth** — Custom authentication with 7-day tokens
 - **Multi-board** — Create and manage multiple boards per account
 - **Docker Compose** — One command to run the entire stack
 
 ## Architecture
-┌─────────────────┐     HTTP/WS      ┌─────────────────┐
-│   React + Vite  │ ◄──────────────► │    Go + Gin     │
-│   TypeScript    │                  │   REST API      │
-│   @dnd-kit      │                  │   WS Hub        │
-│   Tailwind CSS  │                  │                 │
-└─────────────────┘                  └────────┬────────┘
-│
-┌───────────────┼───────────────┐
-│                               │
-┌────────▼──────┐             ┌─────────▼──────┐
-│  PostgreSQL   │             │     Redis      │
-│  users        │             │   pub/sub      │
-│  boards       │             │   (optional)   │
-│  tasks        │             └────────────────┘
-│  activities   │
-└───────────────┘
-## WebSocket Event Flow
+
+- **Frontend:** React, TypeScript, Vite and Tailwind CSS
+- **Backend:** Go, Gin and REST APIs
+- **Real-time communication:** WebSockets with an in-memory Go hub
+- **Database:** PostgreSQL through pgx/v5
+- **Authentication:** JWT and bcrypt password hashing
+- **Deployment:** Render Static Site + Render Web Service + Neon PostgreSQL
+
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| Frontend | React 18 + TypeScript + Vite | UI framework |
-| Styling | Tailwind CSS | Utility-first CSS |
-| Drag & Drop | @dnd-kit | Accessible DnD |
-| Backend | Go 1.23 + Gin | REST API server |
-| WebSockets | gorilla/websocket | Real-time events |
-| Database | PostgreSQL 16 (pgx/v5) | Persistent storage |
-| Cache | Redis 7 | Pub/sub (optional) |
-| Auth | golang-jwt | JWT token auth |
-| DevOps | Docker + Docker Compose | Containerization |
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS |
+| Backend | Go, Gin |
+| Real-time | gorilla/websocket |
+| Database | PostgreSQL, pgx/v5 |
+| Authentication | JWT, bcrypt |
+| Infrastructure | Docker, Render, Neon |
+
+## Live Deployment
+
+**[Launch TaskFlow](https://taskflow-frontend-d7un.onrender.com)**
+
+**[Backend health endpoint](https://taskflow-backend-7xt2.onrender.com/health)**
+
+The public demo supports account registration, boards, task management,
+member invitations, real-time updates, and persistent storage.
+
+The backend uses Render's free tier, so the first request after inactivity
+may take longer while the service starts.
+
+Password recovery is temporarily unavailable until secure email delivery
+is configured.
 
 ## Quick Start
 
-### With Docker (recommended)
+### Docker Compose
+
+Create a local `.env` file in the repository root with `POSTGRES_PASSWORD` and `JWT_SECRET` (at least 32 characters). Never commit this file.
+
 ```bash
-git clone https://github.com/YashwinReddy29/Real-Time-Collaborative-Task-Manager
-cd Real-Time-Collaborative-Task-Manager
-docker compose up --build
+docker compose up --build -d
 ```
 
-Open `http://localhost:3000`
+Open [http://localhost:3000](http://localhost:3000). The local Docker Compose stack includes PostgreSQL and Redis, but the backend does not currently use Redis pub/sub.
 
-### Local Development
+### Development
 
-**Prerequisites:** Go 1.23+, Node 20+, PostgreSQL, Redis
-```bash
-# Start Postgres and Redis
-docker compose up postgres redis -d
-
-# Backend (terminal 1)
-cd backend
-go run ./cmd/server
-
-# Frontend (terminal 2)
-cd frontend
-npm install
-npm run dev
-```
-
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:8080`
+- Backend: `cd backend && go run ./cmd/server`
+- Frontend: `cd frontend && npm ci && npm run dev`
+- Set `DATABASE_URL`, `JWT_SECRET`, and `FRONTEND_URL` for the backend.
+- Vite development frontend: `http://localhost:5173`; Go API: `http://localhost:8080`.
 
 ## API Reference
-Auth
-POST   /api/auth/register
-POST   /api/auth/login
-GET    /api/auth/me
-POST   /api/auth/forgot-password
-POST   /api/auth/reset-password
-Boards
-GET    /api/boards
-POST   /api/boards
-GET    /api/boards/:id
-POST   /api/boards/:id/invite
-Columns
-POST   /api/boards/:id/columns
-DELETE /api/boards/:id/columns/:columnId
-Tasks
-POST   /api/boards/:id/tasks
-PUT    /api/boards/:id/tasks/:taskId
-PATCH  /api/boards/:id/tasks/:taskId/move
-DELETE /api/boards/:id/tasks/:taskId
-Activity
-GET    /api/boards/:id/activity
-WebSocket
-WS     /ws/:boardId?token=<jwt>
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/auth/register` | Register |
+| POST | `/api/auth/login` | Sign in |
+| GET | `/api/auth/me` | Current user |
+| GET | `/api/boards` | List boards |
+| POST | `/api/boards` | Create board |
+| GET | `/api/boards/:boardId` | Board details |
+| POST | `/api/boards/:boardId/invite` | Add a registered member |
+| POST | `/api/boards/:boardId/columns` | Create column |
+| DELETE | `/api/boards/:boardId/columns/:columnId` | Delete column |
+| POST | `/api/boards/:boardId/tasks` | Create task |
+| PUT | `/api/boards/:boardId/tasks/:taskId` | Edit task |
+| PATCH | `/api/boards/:boardId/tasks/:taskId/move` | Move task |
+| DELETE | `/api/boards/:boardId/tasks/:taskId` | Delete task |
+| GET | `/api/boards/:boardId/activity` | Activity history |
+
+WebSocket endpoint: `GET /ws/:boardId` (authenticated handshake).
 
 ## Project Structure
-taskflow/
-├── backend/
-│   ├── cmd/server/main.go           # Entry point, router, dependency wiring
-│   ├── internal/
-│   │   ├── auth/jwt.go              # JWT generation & validation
-│   │   ├── handlers/
-│   │   │   ├── auth.go              # Register, login, forgot/reset password
-│   │   │   ├── board.go             # Board, column, task, invite handlers
-│   │   │   └── ws.go                # WebSocket upgrade + presence broadcast
-│   │   ├── middleware/auth.go       # JWT middleware (header + query param)
-│   │   ├── models/models.go         # Domain models + WS event constants
-│   │   ├── repository/              # PostgreSQL queries per entity
-│   │   └── websocket/hub.go         # WS client hub, broadcast, presence
-│   ├── Dockerfile
-│   └── go.mod
-├── frontend/
-│   ├── src/
-│   │   ├── components/board/
-│   │   │   ├── KanbanBoard.tsx      # DnD context, column layout
-│   │   │   ├── TaskCard.tsx         # Task card with modal trigger
-│   │   │   ├── TaskModal.tsx        # Full task edit modal
-│   │   │   ├── CreateTaskForm.tsx   # Inline task creation
-│   │   │   ├── ActivityFeed.tsx     # Real-time activity sidebar
-│   │   │   └── InviteModal.tsx      # Email invite modal
-│   │   ├── hooks/
-│   │   │   ├── useAuth.ts           # Auth state + login/register/logout
-│   │   │   └── useWebSocket.ts      # WS connection with reconnect logic
-│   │   ├── pages/
-│   │   │   ├── LoginPage.tsx
-│   │   │   ├── RegisterPage.tsx
-│   │   │   ├── ForgotPasswordPage.tsx
-│   │   │   ├── ResetPasswordPage.tsx
-│   │   │   ├── BoardsPage.tsx       # Board list + create board
-│   │   │   └── BoardPage.tsx        # Full Kanban view + WS event handler
-│   │   ├── lib/api.ts               # Axios instance with JWT interceptor
-│   │   └── types/index.ts           # TypeScript interfaces
-│   ├── Dockerfile
-│   └── nginx.conf                   # Reverse proxy for API + WS
-└── docker-compose.yml
+
+```text
+backend/
+  cmd/server/          Go HTTP server
+  internal/auth/       JWT authentication
+  internal/handlers/   REST and WebSocket handlers
+  internal/repository/ PostgreSQL operations
+  internal/websocket/  Real-time client hub
+frontend/
+  src/components/      Board interface
+  src/hooks/           Authentication and WebSocket hooks
+  src/pages/           Application pages
+  src/lib/             Shared API client
+.github/workflows/     CI pipeline
+docker-compose.yml     Local development services
+```
 
 ## How Real-Time Works
 
